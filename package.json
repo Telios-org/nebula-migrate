@@ -1,10 +1,10 @@
 {
   "name": "@telios/nebula-migrate",
-  "version": "1.0.0-alpha.1",
+  "version": "1.0.0",
   "description": "Migration tool for upgrading Nebula Drives between updates with breaking changes",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "tape tests/*.test.js | tap-spec"
   },
   "repository": {
     "type": "git",
@@ -15,5 +15,15 @@
   "bugs": {
     "url": "https://github.com/Telios-org/nebula-migrate/issues"
   },
-  "homepage": "https://github.com/Telios-org/nebula-migrate#readme"
+  "homepage": "https://github.com/Telios-org/nebula-migrate#readme",
+  "devDependencies": {
+    "del": "^6.0.0",
+    "tap-spec": "^5.0.0",
+    "tape": "^5.4.0",
+    "tape-promise": "^4.0.0"
+  },
+  "dependencies": {
+    "@telios/nebula-drive": "^5.3.1",
+    "@telios/nebula-drive-new": "https://github.com/Telios-org/nebula-drive#hyper_latest"
+  }
 }
