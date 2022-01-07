@@ -1,10 +1,10 @@
 const fs = require('fs')
 const path = require('path')
 const del = require('del')
-const Hypercore = require('hypercore')
-const HypercoreNew = require('@telios/nebula-drive-new/node_modules/hypercore')
+const Hypercore = require('@telios/nebula-drive/node_modules/hypercore')
+const HypercoreNew = require('hypercore')
 const Drive = require('@telios/nebula-drive')
-const DriveNew = require('@telios/nebula-drive-new')
+const Nebula = require('@telios/nebula')
 
 module.exports = async ({ rootdir, drivePath, keyPair, encryptionKey }) => {
   // 1. Output all transactions (encrypted) from Autobee into a migration folder. If migration folder exists, run migration
@@ -27,7 +27,7 @@ module.exports = async ({ rootdir, drivePath, keyPair, encryptionKey }) => {
     // Make file for migration script
     await createMigrationScript(drive, rootdir, drivePath)
     // 2. Create a new drive with the latest version
-    const newDrive = new DriveNew(path.join(rootdir, '/drive_new'), null, {
+    const newDrive = new Nebula(path.join(rootdir, '/drive_new'), null, {
       keyPair,
       encryptionKey,
       joinSwarm: false,
@@ -181,12 +181,12 @@ async function populateCores(drive, rootdir, drivePath) {
       for(const item of items) {
         // Not needed anymore
         delete item.value.__sub
-        await collection.put(item.key, item.value)
+        await collection.insert({ ...item.value })
       }
     }
 
     for(const tx of data.main.tx) {
-      await newBee.put(tx.key, tx.value)
+      await newBee.insert({ ...tx.value })
     }
 
     for(const tx of data.meta) {

@@ -18,8 +18,8 @@ module.exports.bootstrap = async ({ path, keyPair, encryptionKey }) => {
 
     const collection = await drive.db.collection('foo')
     
-    await collection.put('hello', { bar: "world" })
-    await collection.put('alice', { name: "fitzgerald" })
+    await collection.put('alice', { name: "alice" })
+    await collection.put('bob', { name: "bob" })
 
     const stream = fs.createReadStream('./index.js')
 
