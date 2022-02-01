@@ -182,6 +182,7 @@ async function populateCores(drive, rootdir, drivePath) {
         // Not needed anymore
         delete item.value.__sub
         await collection.insert({ ...item.value })
+        await indexDoc(sub, collection)
       }
     }
 
@@ -198,5 +199,16 @@ async function populateCores(drive, rootdir, drivePath) {
     }
   } catch(err) {
     throw err
+  }
+}
+
+async function indexDoc(name, collection) {
+  switch(name) {
+    case 'Email':
+      await collection.ftsIndex(['subject', 'toJSON', 'fromJSON', 'ccJSON', 'bccJSON', 'bodyAsText', 'attachments'])
+      break
+    case 'Contact':
+      await collection.ftsIndex(['name', 'email'])
+      break
   }
 }
