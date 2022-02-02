@@ -48,14 +48,11 @@ module.exports = async ({ rootdir, drivePath, keyPair, encryptionKey }) => {
     // Remove new cores so they can be replace. The overwrite option in Hypercore does not seem to work as expected which is why these need to be deleted.
     await copyCores(rootdir, drivePath, encryptionKey)
 
-    // 5. Rename directories and files
+    // 4. Rename directories and files
     const files = fs.readdirSync(path.join(rootdir, drivePath, '/Files'))
 
-    for(file of files) {
-      fs.renameSync(path.join(rootdir, drivePath, '/Files', file), path.join(rootdir, 'drive_new', '/Files', file))
-    }
 
-    // 4. Run transasction scripts to fill new Hypercores
+    // 5. Run transasction scripts to fill new Hypercores
     await newDrive.ready()
     await populateCores(newDrive, rootdir, drivePath)
     await newDrive.close()
@@ -69,7 +66,6 @@ module.exports = async ({ rootdir, drivePath, keyPair, encryptionKey }) => {
 }
 
 async function createMigrationScript(drive, rootdir, drivePath) {
-  try {
     // Make file for migration script
     const mainStream = drive.database.bee.createReadStream()
     const metaStream = drive.database.metadb.createReadStream()
@@ -84,10 +80,13 @@ async function createMigrationScript(drive, rootdir, drivePath) {
       "local": []
     }
 
+  return new Promise((resolve, reject) => {
+    let finished = 0
+
     mainStream.on('data', data => {
       const item = JSON.parse(data.value.toString())
-
       const sub = item.value.__sub
+
       const collection = bees.main.collections[sub]
       
       if(sub && !collection) {
@@ -105,6 +104,8 @@ async function createMigrationScript(drive, rootdir, drivePath) {
 
     mainStream.on('end', () => {
       fs.writeFileSync(path.join(rootdir, drivePath, '/migrate/data.json'), JSON.stringify(bees))
+      finished += 1
+      if(finished === 3) return resolve()
     })
 
     metaStream.on('data', data => {
@@ -113,6 +114,8 @@ async function createMigrationScript(drive, rootdir, drivePath) {
 
     metaStream.on('end', () => {
       fs.writeFileSync(path.join(rootdir, drivePath, '/migrate/data.json'), JSON.stringify(bees))
+      finished += 1
+      if(finished === 3) return resolve()
     })
 
     localStream.on('data', data => {
@@ -121,10 +124,23 @@ async function createMigrationScript(drive, rootdir, drivePath) {
 
     localStream.on('end', () => {
       fs.writeFileSync(path.join(rootdir, drivePath, '/migrate/data.json'), JSON.stringify(bees))
+      finished += 1
+      if(finished === 3) return resolve()
     })
-  } catch(err) {
-    throw err
-  }
+
+    // Handle stream errors
+    mainStream.on('error', err => {
+      return reject(err)
+    })
+
+    metaStream.on('error', err => {
+      return reject(err)
+    })
+
+    localStream.on('error', err => {
+      return reject(err)
+    })
+  })
 }
 
 async function copyCores(rootdir, drivePath, encryptionKey) {
@@ -174,25 +190,59 @@ async function populateCores(drive, rootdir, drivePath) {
     let data = fs.readFileSync(path.join(rootdir, drivePath, '/migrate/data.json'))
     data = JSON.parse(data)
 
-    const newBee = drive.database.bee
     const newMetadb = drive.database.metadb
     const newLocalB = drive._localHB
+
+    let deletedItems = []
     
     for (const sub in data.main.collections) {
       const items = data.main.collections[sub]
       const collection = await drive.db.collection(sub)
-      
+
       for(const item of items) {
+        if(sub === 'file') {
+          // Not needed anymore
+          delete item.value.__sub
+          
+          if(item.value.deleted) {
+            await collection.remove({ uuid: item.value.uuid })
+            const delItem = items.filter(i => i.value?.path && i.value?.uuid === item.value.uuid)
+            
+            deletedItems.push(`${delItem[0].value.path}`)
+          }
+
+          if(!item.value.deleted && item.value.path !== 'backup/encrypted.db') {
+            try {
+              fs.statSync(path.join(rootdir, drivePath, '/Files', '/' + item.value.uuid))
+              await collection.insert({ ...item.value })
+              fs.renameSync(path.join(rootdir, drivePath, '/Files', item.value.uuid), path.join(rootdir, 'drive_new', '/Files', item.value.uuid))
+            } catch(err) {
+              // process.send({ event: 'debug:info', data: { name: 'DEL FILE ERR', file: item.value } })
+              deletedItems.push(`/${item.value.path}`)
+            }
+          }
+        }
+      }
+
+      for(const item of items) {   
+        if(deletedItems.indexOf(item.value.path) > -1) {
+          continue
+        }
+        
         // Not needed anymore
         delete item.value.__sub
 
         if(sub === 'Email') {
-          let email = await getEmail(drive, item.value.path)
+          let email
           
+          email = await getEmail(drive, item.value.path)
+
           email = {
             emailId: email.emailId,
             aliasId: email.aliasId,
             folderId: email.folderId,
+            mailboxId: 1,
+            date: email.date,
             unread: email.unread,
             subject: email.subject,
             toJSON: email.toJSON,
@@ -201,20 +251,27 @@ async function populateCores(drive, rootdir, drivePath) {
             bccJSON: email.bccJSON,
             bodyAsText: email.bodyAsText,
             attachments: email.attachments,
-            path: email.path
+            key: item.value.key,
+            header: item.value.header,
+            hash: item.value.hash,
+            path: item.value.path,
+            discovery_key: item.value.discovery_key,
+            size: item.value.size,
+            encrypted: item.value.encrypted,
+            path: email.path,
+            createdAt: email.date,
+            udpatedAt: new Date().toISOString(),
           }
-
-          await collection.insert(email)
-          await indexDoc(sub, collection)
+          
+          if(email.emailId && email.folderId || email.emailId && email.aliasId) {
+            await collection.insert(email)
+            process.send({ event: 'debug:info', data: { name: 'DOC INSERTED', email} })
+          }
         } else {
           await collection.insert({ ...item.value })
-          await indexDoc(sub, collection)
         }
       }
-    }
-
-    for(const tx of data.main.tx) {
-      await newBee.insert({ ...tx.value })
+      await indexDoc(sub, collection)
     }
 
     for(const tx of data.meta) {
@@ -224,7 +281,7 @@ async function populateCores(drive, rootdir, drivePath) {
     for(const tx of data.local) {
       await newLocalB.put(tx.key, tx.value)
     }
-    
+
   } catch(err) {
     throw err
   }
