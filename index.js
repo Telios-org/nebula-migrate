@@ -60,6 +60,7 @@ module.exports = async ({ rootdir, drivePath, keyPair, encryptionKey }) => {
     
     fs.renameSync(path.join(rootdir, drivePath), path.join(rootdir, drivePath + '_old'))
     fs.renameSync(path.join(rootdir, 'drive_new'), path.join(rootdir, drivePath))
+    fs.unlinkSync(path.join(rootdir, drivePath + '_old', '/migrate/data.json'))
   } catch(err) {
     console.log(err)
   }
