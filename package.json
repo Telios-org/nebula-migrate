@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@telios/nebula": "^1.5.4",
-    "@telios/nebula-drive": "^5.3.1"
+    "@telios/nebula-drive": "^5.3.1",
+    "hypercore": "10.0.0-alpha.23"
   }
 }

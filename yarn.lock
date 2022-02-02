@@ -113,12 +113,12 @@
     sodium-native "^3.2.0"
     uuid "^8.2.0"
 
-"@telios/nebula@^1.5.3":
-  version "1.5.3"
-  resolved "https://registry.yarnpkg.com/@telios/nebula/-/nebula-1.5.3.tgz#61930206053b7800e348a247a9a75f0a0b8d404c"
-  integrity sha512-GyQbIBiAGezvtuSWYFE2/sOuXcoR9FpMFyfPyYScI2ccL1cDttp3UxoAPGyFkUbHxE1iREEAXlHO+gJoQ5VKWg==
+"@telios/nebula@^1.5.4":
+  version "1.5.4"
+  resolved "https://registry.yarnpkg.com/@telios/nebula/-/nebula-1.5.4.tgz#b1f76b6451041ad41069d2b2917bc18be9858e1a"
+  integrity sha512-UUf7tqJ/WOGhvePZVnxWNHgDLe/tQ0bQALKugmF9wTgBjNWc8JGb0hhHYzDM/lg8KNN8QHx5DPtV2oBWr7gmyQ==
   dependencies:
-    autobase "1.0.0-alpha.8"
+    autobase "1.0.0-alpha.6"
     blakejs "^1.1.0"
     chokidar "^3.5.1"
     codecs "^2.2.0"
@@ -127,7 +127,7 @@
     dat-encoding "^5.0.1"
     hyperbee "^1.6.3"
     hyperbeedeebee "git+https://github.com/hexadecible/hyperbeedeebee.git"
-    hypercore "10.0.0-alpha.24"
+    hypercore "10.0.0-alpha.23"
     hyperswarm "^3.0.1"
     is-online "^9.0.1"
     memorystream "^0.3.1"
@@ -253,10 +253,10 @@ autobase@1.0.0-alpha.1:
     safety-catch "^1.0.1"
     streamx "^2.10.0"
 
-autobase@1.0.0-alpha.8:
-  version "1.0.0-alpha.8"
-  resolved "https://registry.yarnpkg.com/autobase/-/autobase-1.0.0-alpha.8.tgz#a75b5ff85156d4ff5084293bbe6e78ae6a4dcb4f"
-  integrity sha512-Dnlw2u0DCZEY6CPbeLW9YI9MIwR+3kCQueqhzt8XZB98frplQrCtzK8DOjju+mYUGdFviyTUmYto9LCF3aXWdQ==
+autobase@1.0.0-alpha.6:
+  version "1.0.0-alpha.6"
+  resolved "https://registry.yarnpkg.com/autobase/-/autobase-1.0.0-alpha.6.tgz#0511450ccb11c9a2d280315233ecbe12926166c7"
+  integrity sha512-aG+fr+E6bUYZ3hy/gKiOKaFu++lto17XsoMO9Zgn+XQuSgGktHaWhO2kL9Fkl5lmComxRVxmvRa09HVQ+WlyJg==
   dependencies:
     codecs "^2.2.0"
     compact-encoding "^2.0.0"
@@ -1132,10 +1132,10 @@ hypercore@10.0.0-alpha.13:
   optionalDependencies:
     fsctl "^1.0.0"
 
-hypercore@10.0.0-alpha.24, hypercore@next:
-  version "10.0.0-alpha.24"
-  resolved "https://registry.yarnpkg.com/hypercore/-/hypercore-10.0.0-alpha.24.tgz#2025488f14c5d5cb375f4184adedcc68dd13a6cf"
-  integrity sha512-cIHZWWctozdcbxAOnCIXYFhxt9MAPFZiGEfliI20vq3HLvCfTaUORT2aDCNJTdifWLNRnCryDKnmlVRiGjK1Uw==
+hypercore@10.0.0-alpha.23:
+  version "10.0.0-alpha.23"
+  resolved "https://registry.yarnpkg.com/hypercore/-/hypercore-10.0.0-alpha.23.tgz#0d6ea0372585187be657d6a90e900a4c831fe7e6"
+  integrity sha512-J5wZjd0k1g6MRPOjoBrvVM8GhRezcBO9Wde3uwU2TE65JaUQXzFoZAFDSS2ty3+WAwcEQa70k08SK1eo50ORgw==
   dependencies:
     "@hyperswarm/secret-stream" "^5.0.0"
     b4a "^1.1.0"
@@ -1184,6 +1184,29 @@ hypercore@^9.0.0:
     uint64be "^2.0.1"
     unordered-array-remove "^1.0.2"
     unordered-set "^2.0.0"
+
+hypercore@next:
+  version "10.0.0-alpha.24"
+  resolved "https://registry.yarnpkg.com/hypercore/-/hypercore-10.0.0-alpha.24.tgz#2025488f14c5d5cb375f4184adedcc68dd13a6cf"
+  integrity sha512-cIHZWWctozdcbxAOnCIXYFhxt9MAPFZiGEfliI20vq3HLvCfTaUORT2aDCNJTdifWLNRnCryDKnmlVRiGjK1Uw==
+  dependencies:
+    "@hyperswarm/secret-stream" "^5.0.0"
+    b4a "^1.1.0"
+    big-sparse-array "^1.0.2"
+    codecs "^3.0.0"
+    compact-encoding "^2.5.0"
+    crc32-universal "^1.0.1"
+    events "^3.3.0"
+    flat-tree "^1.9.0"
+    hypercore-crypto "^3.1.0"
+    is-options "^1.0.1"
+    random-access-file "^2.1.4"
+    random-array-iterator "^1.0.0"
+    safety-catch "^1.0.1"
+    sodium-universal "^3.0.4"
+    xache "^1.0.0"
+  optionalDependencies:
+    fsctl "^1.0.0"
 
 hyperswarm@^3.0.1:
   version "3.0.1"
