@@ -213,8 +213,6 @@ async function populateCores(drive, rootdir, drivePath) {
       }
     }
 
-    
-
     for(const tx of data.main.tx) {
       await newBee.insert({ ...tx.value })
     }
