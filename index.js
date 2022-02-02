@@ -252,17 +252,14 @@ async function populateCores(drive, rootdir, drivePath) {
             bccJSON: email.bccJSON,
             bodyAsText: email.bodyAsText,
             attachments: email.attachments,
+            size: email.size,
             path: item.value.path,
-            discovery_key: item.value.discovery_key,
-            size: item.value.size,
-            encrypted: item.value.encrypted,
             createdAt: email.date,
             udpatedAt: new Date().toISOString(),
           }
           
           if(email.emailId && email.folderId || email.emailId && email.aliasId) {
             await collection.insert(email)
-            process.send({ event: 'debug:info', data: { name: 'DOC INSERTED', email} })
           }
         } else {
           await collection.insert({ ...item.value })
