@@ -207,7 +207,7 @@ async function populateCores(drive, rootdir, drivePath) {
           
           if(item.value.deleted) {
             await collection.remove({ uuid: item.value.uuid })
-            const delItem = items.filter(i => i.value?.path && i.value?.uuid === item.value.uuid)
+            const delItem = items.filter(i => i.value.path && i.value.uuid === item.value.uuid)
             
             deletedItems.push(`${delItem[0].value.path}`)
           }
