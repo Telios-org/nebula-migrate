@@ -147,12 +147,11 @@ async function createMigrationScript(drive, rootdir, drivePath) {
 async function copyCores(rootdir, drivePath, encryptionKey) {
   try {
     const newCores = fs.readdirSync(path.join(rootdir, 'drive_new', '/Database'))
-
     for(const core of newCores) {
       if (fs.existsSync(path.join(rootdir, 'drive_new', '/Database/' + core))) {
         await del([
           path.join(rootdir, 'drive_new', '/Database/' + core)
-        ])
+        ], { force: true })
       }
     }
 
@@ -160,7 +159,6 @@ async function copyCores(rootdir, drivePath, encryptionKey) {
     let cores
     
     cores = fs.readdirSync(path.join(rootdir, drivePath, '/Database'))
-
     for(const core of cores) {
       if(core.indexOf('.DS_Store') === -1) {
         let feed = new Hypercore(path.join(rootdir, drivePath, '/Database/' + core), { encryptionKey })
@@ -171,12 +169,10 @@ async function copyCores(rootdir, drivePath, encryptionKey) {
 
         await feed.close()
 
-
         feed = new HypercoreNew(path.join(rootdir, 'drive_new', '/Database/' + core), { keyPair, encryptionKey })
 
         await feed.ready()
 
-        keyPair = feed.core.header.signer
         await feed.close()
       }
     }
@@ -259,13 +255,15 @@ async function populateCores(drive, rootdir, drivePath) {
           }
           
           if(email.emailId && email.folderId || email.emailId && email.aliasId) {
+            await createIndex(sub, collection)
             await collection.insert(email)
           }
         } else {
+          await createIndex(sub, collection)
           await collection.insert({ ...item.value })
         }
       }
-      await indexDoc(sub, collection)
+      await createSearchIndex(sub, collection)
     }
 
     for(const tx of data.meta) {
@@ -281,13 +279,38 @@ async function populateCores(drive, rootdir, drivePath) {
   }
 }
 
-async function indexDoc(name, collection) {
+async function createSearchIndex(name, collection) {
   switch(name) {
     case 'Email':
       await collection.ftsIndex(['subject', 'toJSON', 'fromJSON', 'ccJSON', 'bccJSON', 'bodyAsText', 'attachments'])
       break
     case 'Contact':
       await collection.ftsIndex(['name', 'email'])
+      break
+  }
+}
+
+async function createIndex(name, collection) {
+  switch(name) {
+    case 'Folder':
+      await collection.createIndex(['createdAt', 'folderId', 'mailboxId'])
+      await collection.createIndex(['updatedAt'])
+      await collection.createIndex(['seq'])
+      break
+    case 'Alias':
+      await collection.createIndex(['createdAt', 'name'])
+      break
+    case 'AliasNamespace':
+      await collection.createIndex(['name', 'mailboxId'])
+      break
+    case 'Email':
+      await collection.createIndex(['date'])
+      await collection.createIndex(['emailId'])
+      await collection.createIndex(['folderId'])
+      break
+    case 'Files':
+      await collection.createIndex(['createdAt', 'filename'])
+      await collection.createIndex(['updatedAt'])
       break
   }
 }
