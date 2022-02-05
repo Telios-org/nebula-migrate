@@ -240,7 +240,7 @@ async function populateCores(drive, rootdir, drivePath) {
             folderId: email.folderId,
             mailboxId: 1,
             date: email.date,
-            unread: email.unread,
+            unread: item.value.unread ? true : false,
             subject: email.subject,
             toJSON: email.toJSON,
             fromJSON: email.fromJSON,
@@ -251,7 +251,7 @@ async function populateCores(drive, rootdir, drivePath) {
             size: email.size,
             path: item.value.path,
             createdAt: email.date,
-            udpatedAt: new Date().toISOString(),
+            udpatedAt: new Date().toISOString()
           }
           
           if(email.emailId && email.folderId || email.emailId && email.aliasId) {
