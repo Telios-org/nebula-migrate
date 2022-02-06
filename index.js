@@ -6,11 +6,9 @@ const HypercoreNew = require('hypercore')
 const Drive = require('@telios/nebula-drive')
 const Nebula = require('@telios/nebula')
 
-module.exports = async ({ rootdir, drivePath, keyPair, encryptionKey }) => {
+module.exports = async ({ rootdir, drivePath, keyPair, encryptionKey, data }) => {
   // 1. Output all transactions (encrypted) from Autobee into a migration folder. If migration folder exists, run migration
   try {
-    fs.mkdirSync(path.join(rootdir, drivePath, 'migrate'))
-
     // Start old drive
     const drive = new Drive(path.join(rootdir, drivePath), null, {
       keyPair,
@@ -24,8 +22,6 @@ module.exports = async ({ rootdir, drivePath, keyPair, encryptionKey }) => {
 
     await drive.ready()
 
-    // Make file for migration script
-    await createMigrationScript(drive, rootdir, drivePath)
     // 2. Create a new drive with the latest version
     const newDrive = new Nebula(path.join(rootdir, '/drive_new'), null, {
       keyPair,
@@ -41,6 +37,9 @@ module.exports = async ({ rootdir, drivePath, keyPair, encryptionKey }) => {
     // Initialize and close new drive only to populate necessary files and directories
     await newDrive.ready()
     await newDrive.close()
+
+    // Make file for migration script
+    await updateMigrationScript(data, drive, rootdir, drivePath)
 
     // Close old drive before extracting and populating Hypercores
     await drive.close()
@@ -66,20 +65,11 @@ module.exports = async ({ rootdir, drivePath, keyPair, encryptionKey }) => {
   }
 }
 
-async function createMigrationScript(drive, rootdir, drivePath) {
+async function updateMigrationScript(db, drive, rootdir, drivePath) {
     // Make file for migration script
     const mainStream = drive.database.bee.createReadStream()
     const metaStream = drive.database.metadb.createReadStream()
     const localStream = drive._localHB.createReadStream()
-
-    let bees = {
-      "main": {
-        "collections": {},
-        "tx": []
-      },
-      "meta": [],
-      "local": []
-    }
 
   return new Promise((resolve, reject) => {
     let finished = 0
@@ -88,43 +78,50 @@ async function createMigrationScript(drive, rootdir, drivePath) {
       const item = JSON.parse(data.value.toString())
       const sub = item.value.__sub
 
-      const collection = bees.main.collections[sub]
-      
-      if(sub && !collection) {
-        bees.main.collections[sub] = [item]
-      }
-
-      if(sub && collection) {
-        collection.push(item)
-      }
-
-      if(!sub) {
-        bees.main.tx.push(JSON.parse(data.value.toString()))
+      if(sub === 'file' && item.type !== 'del' && item.key !== 'backup/encrypted.db') {
+        delete item.value.__sub
+        db.main.collections.file.push(item.value)
       }
     })
 
     mainStream.on('end', () => {
-      fs.writeFileSync(path.join(rootdir, drivePath, '/migrate/data.json'), JSON.stringify(bees))
+      fs.writeFileSync(path.join(rootdir, drivePath, '/migrate/data.json'), JSON.stringify(db))
       finished += 1
       if(finished === 3) return resolve()
     })
 
     metaStream.on('data', data => {
-      bees.meta.push(JSON.parse(data.value.toString()))
+      const item = JSON.parse(data.value.toString())
+      db.meta[item.key] = item.value
     })
 
-    metaStream.on('end', () => {
-      fs.writeFileSync(path.join(rootdir, drivePath, '/migrate/data.json'), JSON.stringify(bees))
+    metaStream.on('end', async () => {
+
+      for(const key in db.meta) {
+        const item = db.meta[key]
+
+        if(item.path && item.path !== '/backup/encrypted.db') {
+          try {
+            fs.statSync(path.join(rootdir, drivePath, '/Files', item.path))
+            fs.renameSync(path.join(rootdir, drivePath, '/Files',  item.path), path.join(rootdir, 'drive_new', '/Files',  item.path))
+          } catch(err) {
+            process.send({ event: 'debug:info', data: { name: 'DEL FILE ERR', err: JSON.stringify(err)} })
+          }
+        }
+      }
+
+      fs.writeFileSync(path.join(rootdir, drivePath, '/migrate/data.json'), JSON.stringify(db))
       finished += 1
       if(finished === 3) return resolve()
     })
 
     localStream.on('data', data => {
-      bees.local.push(JSON.parse(data.value.toString()))
+      const item = JSON.parse(data.value.toString())
+      db.local[item.key] = item.value
     })
 
     localStream.on('end', () => {
-      fs.writeFileSync(path.join(rootdir, drivePath, '/migrate/data.json'), JSON.stringify(bees))
+      fs.writeFileSync(path.join(rootdir, drivePath, '/migrate/data.json'), JSON.stringify(db))
       finished += 1
       if(finished === 3) return resolve()
     })
@@ -190,49 +187,23 @@ async function populateCores(drive, rootdir, drivePath) {
     const newMetadb = drive.database.metadb
     const newLocalB = drive._localHB
 
-    let deletedItems = []
+    for(const key in data.meta) {
+      await newMetadb.put(key, data.meta[key])
+    }
+
+    for(const key in data.local) {
+      await newLocalB.put(key, data.local[key])
+    }
     
     for (const sub in data.main.collections) {
       const items = data.main.collections[sub]
       const collection = await drive.db.collection(sub)
 
-      for(const item of items) {
-        if(sub === 'file') {
-          // Not needed anymore
-          delete item.value.__sub
-          
-          if(item.value.deleted) {
-            await collection.remove({ uuid: item.value.uuid })
-            const delItem = items.filter(i => i.value.path && i.value.uuid === item.value.uuid)
-            
-            deletedItems.push(`${delItem[0].value.path}`)
-          }
-
-          if(!item.value.deleted && item.value.path !== 'backup/encrypted.db') {
-            try {
-              fs.statSync(path.join(rootdir, drivePath, '/Files', '/' + item.value.uuid))
-              await collection.insert({ ...item.value })
-              fs.renameSync(path.join(rootdir, drivePath, '/Files', item.value.uuid), path.join(rootdir, 'drive_new', '/Files', item.value.uuid))
-            } catch(err) {
-              // process.send({ event: 'debug:info', data: { name: 'DEL FILE ERR', file: item.value } })
-              deletedItems.push(`/${item.value.path}`)
-            }
-          }
-        }
-      }
-
       for(const item of items) {   
-        if(deletedItems.indexOf(item.value.path) > -1) {
-          continue
-        }
-        
-        // Not needed anymore
-        delete item.value.__sub
-
         if(sub === 'Email') {
           let email
           
-          email = await getEmail(drive, item.value.path)
+          email = await getEmail(drive, item.path)
 
           email = {
             emailId: email.emailId,
@@ -240,7 +211,7 @@ async function populateCores(drive, rootdir, drivePath) {
             folderId: email.folderId,
             mailboxId: 1,
             date: email.date,
-            unread: item.value.unread ? true : false,
+            unread: email.unread,
             subject: email.subject,
             toJSON: email.toJSON,
             fromJSON: email.fromJSON,
@@ -248,30 +219,21 @@ async function populateCores(drive, rootdir, drivePath) {
             bccJSON: email.bccJSON,
             bodyAsText: email.bodyAsText,
             attachments: email.attachments,
-            size: email.size,
-            path: item.value.path,
-            createdAt: email.date,
-            udpatedAt: new Date().toISOString()
+            path: email.path,
+            createdAt: email.createdAt || email.date,
+            updatedAt: email.updatedAt || new Date().toISOString(),
           }
-          
+
           if(email.emailId && email.folderId || email.emailId && email.aliasId) {
             await createIndex(sub, collection)
             await collection.insert(email)
           }
         } else {
           await createIndex(sub, collection)
-          await collection.insert({ ...item.value })
+          await collection.insert({ ...item })
         }
       }
       await createSearchIndex(sub, collection)
-    }
-
-    for(const tx of data.meta) {
-      await newMetadb.put(tx.key, tx.value)
-    }
-
-    for(const tx of data.local) {
-      await newLocalB.put(tx.key, tx.value)
     }
 
   } catch(err) {
