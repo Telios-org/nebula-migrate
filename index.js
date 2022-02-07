@@ -221,7 +221,7 @@ async function populateCores(drive, rootdir, drivePath) {
             attachments: email.attachments,
             path: item.path,
             createdAt: email.createdAt || email.date,
-            updatedAt: email.updatedAt || new Date().toISOString(),
+            updatedAt: email.updatedAt || new Date().toUTCString(),
           }
 
           if(email.emailId && email.folderId || email.emailId && email.aliasId) {
