@@ -211,7 +211,7 @@ async function populateCores(drive, rootdir, drivePath) {
             folderId: email.folderId,
             mailboxId: 1,
             date: email.date,
-            unread: email.unread,
+            unread: item.unread,
             subject: email.subject,
             toJSON: email.toJSON,
             fromJSON: email.fromJSON,
@@ -219,7 +219,7 @@ async function populateCores(drive, rootdir, drivePath) {
             bccJSON: email.bccJSON,
             bodyAsText: email.bodyAsText,
             attachments: email.attachments,
-            path: email.path,
+            path: item.path,
             createdAt: email.createdAt || email.date,
             updatedAt: email.updatedAt || new Date().toISOString(),
           }
@@ -267,8 +267,7 @@ async function createIndex(name, collection) {
       break
     case 'Email':
       await collection.createIndex(['date'])
-      await collection.createIndex(['emailId'])
-      await collection.createIndex(['folderId'])
+      await collection.createIndex(['emailId', 'folderId'])
       break
     case 'Files':
       await collection.createIndex(['createdAt', 'filename'])
