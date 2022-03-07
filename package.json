@@ -1,6 +1,6 @@
 {
   "name": "@telios/nebula-migrate",
-  "version": "2.0.5",
+  "version": "2.0.6",
   "description": "Migration tool for upgrading Nebula Drives between updates with breaking changes",
   "main": "index.js",
   "scripts": {
