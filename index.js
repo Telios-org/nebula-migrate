@@ -22,6 +22,19 @@ module.exports = async ({ rootdir, drivePath, keyPair, encryptionKey, data }) =>
     await drive.ready()
 
     // 2. Create a new drive with the latest version
+    fs.mkdirSync(path.join(rootdir, '/drive_new'))
+    fs.mkdirSync(path.join(rootdir, '/drive_new/Database'))
+    fs.mkdirSync(path.join(rootdir, '/drive_new/Files'))
+
+    // 3. Make file for migration script
+    await updateMigrationScript(data, drive, rootdir, drivePath)
+
+    // Close old drive before extracting and populating Hypercores
+    await drive.close()
+
+    // 4. Remove new cores so they can be replace. The overwrite option in Hypercore does not seem to work as expected which is why these need to be deleted.
+    await copyCores(rootdir, drivePath, encryptionKey)
+
     const newDrive = new Nebula(path.join(rootdir, '/drive_new'), null, {
       keyPair,
       encryptionKey,
@@ -33,29 +46,11 @@ module.exports = async ({ rootdir, drivePath, keyPair, encryptionKey, data }) =>
       }
     })
 
-    // Initialize and close new drive only to populate necessary files and directories
-    await newDrive.ready()
-    await newDrive.close()
-
-    // Make file for migration script
-    await updateMigrationScript(data, drive, rootdir, drivePath)
-
-    // Close old drive before extracting and populating Hypercores
-    await drive.close()
-
-    // Remove new cores so they can be replace. The overwrite option in Hypercore does not seem to work as expected which is why these need to be deleted.
-    await copyCores(rootdir, drivePath, encryptionKey)
-
-    // 4. Rename directories and files
-    const files = fs.readdirSync(path.join(rootdir, drivePath, '/Files'))
-
-
     // 5. Run transasction scripts to fill new Hypercores
     await newDrive.ready()
     await populateCores(newDrive, rootdir, drivePath)
     await newDrive.close()
 
-    
     fs.renameSync(path.join(rootdir, drivePath), path.join(rootdir, drivePath + '_old'))
     fs.renameSync(path.join(rootdir, 'drive_new'), path.join(rootdir, drivePath))
     fs.unlinkSync(path.join(rootdir, drivePath + '_old', '/migrate/data.json'))
@@ -95,7 +90,6 @@ async function updateMigrationScript(db, drive, rootdir, drivePath) {
     })
 
     metaStream.on('end', async () => {
-
       for(const key in db.meta) {
         const item = db.meta[key]
 
@@ -142,14 +136,6 @@ async function updateMigrationScript(db, drive, rootdir, drivePath) {
 
 async function copyCores(rootdir, drivePath, encryptionKey) {
   try {
-    const newCores = fs.readdirSync(path.join(rootdir, 'drive_new', '/Database'))
-    for(const core of newCores) {
-      const path = path.join(rootdir, 'drive_new', '/Database/' + core)
-      if (fs.existsSync(path)) {
-        fs.rmSync(path, { recursive: true, force: true });
-      }
-    }
-
     // Rebuild Hypercores with existing keyPairs
     let cores
     
@@ -173,6 +159,7 @@ async function copyCores(rootdir, drivePath, encryptionKey) {
     }
 
   } catch(err) {
+    process.send({ event: 'CORE_MIGRATE_ERROR', data: { message: err.message, stack: err.stack } })
     throw err
   }
 }
@@ -199,53 +186,58 @@ async function populateCores(drive, rootdir, drivePath) {
 
       for(const item of items) {   
         if(sub === 'Email') {
-          let email
-          
-          email = await getEmail(drive, item.path)
+          const fullEmail = await getEmail(drive, item.path)
 
-          email = {
-            emailId: email.emailId,
-            aliasId: email.aliasId,
-            folderId: email.folderId,
+          let email = {
+            emailId: fullEmail.emailId,
+            aliasId: fullEmail.aliasId,
+            folderId: fullEmail.folderId,
             mailboxId: 1,
-            date: email.date,
+            date: fullEmail.date,
             unread: item.unread,
-            subject: email.subject,
-            toJSON: email.toJSON,
-            fromJSON: email.fromJSON,
-            ccJSON: email.ccJSON,
-            bccJSON: email.bccJSON,
-            bodyAsText: email.bodyAsText,
-            attachments: email.attachments,
+            subject: fullEmail.subject,
+            toJSON: fullEmail.toJSON,
+            fromJSON: fullEmail.fromJSON,
+            attachments: fullEmail.attachments,
             path: item.path,
-            createdAt: email.createdAt || email.date,
-            updatedAt: email.updatedAt || new Date().toUTCString(),
+            createdAt: fullEmail.createdAt || fullEmail.date,
+            updatedAt: fullEmail.updatedAt || new Date().toUTCString()
+          }
+
+          if(fullEmail.bodyAsText) {
+            email.bodyAsText = fullEmail.bodyAsText.split(" ").slice(0, 20).join(" ")
           }
 
           if(email.emailId && email.folderId || email.emailId && email.aliasId) {
-            await createIndex(sub, collection)
-            await collection.insert(email)
+            const doc = await collection.insert(email)
+            
+            await createSearchIndex(sub, collection, { ...fullEmail, _id: doc._id })
           }
         } else {
-          await createIndex(sub, collection)
-          await collection.insert({ ...item })
+          const doc = await collection.insert({ ...item })
+          await createSearchIndex(sub, collection, { ...item, _id: doc._id })
         }
       }
-      await createSearchIndex(sub, collection)
+      await createIndex(sub, collection)
     }
 
   } catch(err) {
+    process.send({ event: 'POPULATE_ERROR', data: { message: err.message, stack: err.stack } })
     throw err
   }
 }
 
-async function createSearchIndex(name, collection) {
+async function createSearchIndex(name, collection, doc) {
   switch(name) {
     case 'Email':
-      await collection.ftsIndex(['subject', 'toJSON', 'fromJSON', 'ccJSON', 'bccJSON', 'bodyAsText', 'attachments'])
+      try {
+        await collection.ftsIndex(['subject', 'toJSON', 'fromJSON', 'ccJSON', 'bccJSON', 'bodyAsText', 'attachments'], [doc])
+      } catch(err) {
+        process.send({ event: 'INDEX_ERROR', data: { message: err.message, stack: err.stack } })
+      }
       break
     case 'Contact':
-      await collection.ftsIndex(['name', 'email'])
+      await collection.ftsIndex(['name', 'email'], [doc])
       break
   }
 }
@@ -264,8 +256,7 @@ async function createIndex(name, collection) {
       await collection.createIndex(['name', 'mailboxId'])
       break
     case 'Email':
-      await collection.createIndex(['date'])
-      await collection.createIndex(['emailId', 'folderId'])
+      await collection.createIndex(['date', 'folderId', 'emailId'])
       break
     case 'Files':
       await collection.createIndex(['createdAt', 'filename'])
