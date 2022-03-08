@@ -1,6 +1,5 @@
 const fs = require('fs')
 const path = require('path')
-const del = require('del')
 const Hypercore = require('@telios/nebula-drive/node_modules/hypercore')
 const HypercoreNew = require('hypercore')
 const Drive = require('@telios/nebula-drive')
@@ -145,10 +144,9 @@ async function copyCores(rootdir, drivePath, encryptionKey) {
   try {
     const newCores = fs.readdirSync(path.join(rootdir, 'drive_new', '/Database'))
     for(const core of newCores) {
-      if (fs.existsSync(path.join(rootdir, 'drive_new', '/Database/' + core))) {
-        await del([
-          path.join(rootdir, 'drive_new', '/Database/' + core)
-        ], { force: true })
+      const path = path.join(rootdir, 'drive_new', '/Database/' + core)
+      if (fs.existsSync(path)) {
+        fs.rmSync(path, { recursive: true, force: true });
       }
     }
 
