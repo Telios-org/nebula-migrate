@@ -4,6 +4,7 @@ const Hypercore = require('@telios/nebula-drive/node_modules/hypercore')
 const HypercoreNew = require('hypercore')
 const Drive = require('@telios/nebula-drive')
 const Nebula = require('@telios/nebula')
+const { DateTime } = require('luxon')
 
 module.exports = async ({ rootdir, drivePath, keyPair, encryptionKey, data }) => {
   // 1. Output all transactions (encrypted) from Autobee into a migration folder. If migration folder exists, run migration
@@ -188,20 +189,24 @@ async function populateCores(drive, rootdir, drivePath) {
         if(sub === 'Email') {
           const fullEmail = await getEmail(drive, item.path)
 
+          const date = DateTime.fromISO(fullEmail.date)
+          const createdAt = DateTime.fromISO(fullEmail.createdAt || date)
+          const updatedAt = DateTime.fromISO(fullEmail.updatedAt || new Date().toUTCString())
+
           let email = {
             emailId: fullEmail.emailId,
             aliasId: fullEmail.aliasId,
             folderId: fullEmail.folderId,
             mailboxId: 1,
-            date: fullEmail.date,
+            date: date.toUTC(),
             unread: item.unread,
             subject: fullEmail.subject,
             toJSON: fullEmail.toJSON,
             fromJSON: fullEmail.fromJSON,
             attachments: fullEmail.attachments,
             path: item.path,
-            createdAt: fullEmail.createdAt || fullEmail.date,
-            updatedAt: fullEmail.updatedAt || new Date().toUTCString()
+            createdAt: createdAt.toUTC(),
+            updatedAt: updatedAt.toUTC()
           }
 
           if(fullEmail.bodyAsText) {
