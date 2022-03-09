@@ -189,24 +189,20 @@ async function populateCores(drive, rootdir, drivePath) {
         if(sub === 'Email') {
           const fullEmail = await getEmail(drive, item.path)
 
-          const date = DateTime.fromISO(fullEmail.date)
-          const createdAt = DateTime.fromISO(fullEmail.createdAt || date)
-          const updatedAt = DateTime.fromISO(fullEmail.updatedAt || new Date().toUTCString())
-
           let email = {
             emailId: fullEmail.emailId,
             aliasId: fullEmail.aliasId,
             folderId: fullEmail.folderId,
             mailboxId: 1,
-            date: date.toUTC(),
+            date: new Date(fullEmail.date).toISOString(),
             unread: item.unread,
             subject: fullEmail.subject,
             toJSON: fullEmail.toJSON,
             fromJSON: fullEmail.fromJSON,
             attachments: fullEmail.attachments,
             path: item.path,
-            createdAt: createdAt.toUTC(),
-            updatedAt: updatedAt.toUTC()
+            createdAt: new Date(fullEmail.date).toISOString(),
+            updatedAt: new Date().toISOString()
           }
 
           if(fullEmail.bodyAsText) {
