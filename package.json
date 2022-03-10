@@ -23,7 +23,7 @@
     "tape-promise": "^4.0.0"
   },
   "dependencies": {
-    "@telios/nebula": "^2.3.1",
+    "@telios/nebula": "^2.4.2",
     "@telios/nebula-drive": "^5.3.1",
     "hypercore": "10.0.0-alpha.23"
   }
