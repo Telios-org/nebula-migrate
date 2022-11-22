@@ -56,13 +56,13 @@ test('migrate previous version to new version', async t => {
 
 test.onFinish(async () => {
 
-  if (fs.existsSync(path.join(__dirname, '/drive'))) {
-    rmdir(path.join(__dirname, '/drive'))
-  }
+  // if (fs.existsSync(path.join(__dirname, '/drive'))) {
+  //   rmdir(path.join(__dirname, '/drive'))
+  // }
 
-  if (fs.existsSync(path.join(__dirname, '/drive_old'))) {
-    rmdir(path.join(__dirname, '/drive_old'))
-  }
+  // if (fs.existsSync(path.join(__dirname, '/drive_old'))) {
+  //   rmdir(path.join(__dirname, '/drive_old'))
+  // }
 
   process.exit(0)
 })

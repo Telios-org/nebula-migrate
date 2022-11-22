@@ -56,6 +56,7 @@ module.exports = async ({ rootdir, drivePath, keyPair, encryptionKey, data }) =>
     // 5. Run transasction scripts to fill new Hypercores
     await newDrive.ready()
     await populateCores(newDrive, rootdir, drivePath)
+    copyFiles(rootdir, drivePath)
     await newDrive.close()
 
     fs.renameSync(path.join(rootdir, drivePath), path.join(rootdir, drivePath + '_old'))
@@ -63,6 +64,16 @@ module.exports = async ({ rootdir, drivePath, keyPair, encryptionKey, data }) =>
     fs.unlinkSync(path.join(rootdir, drivePath + '_old', '/migrate/data.txt'))
   } catch(err) {
     console.log(err)
+  }
+}
+
+function copyFiles(rootdir, drivePath) {
+  const files = fs.readdirSync(path.join(rootdir, drivePath, '/Files'))
+
+  for(const file of files) {
+    const currDir = path.join(rootdir, drivePath, '/Files', file)
+    const dest = path.join(rootdir, 'drive_new/Files', file)
+    fs.copyFileSync(currDir, dest)
   }
 }
 
