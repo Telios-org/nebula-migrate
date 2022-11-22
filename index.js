@@ -1,16 +1,22 @@
 const fs = require('fs')
+const readline = require('readline')
 const path = require('path')
-const Hypercore = require('@telios/nebula-drive/node_modules/hypercore')
-const HypercoreNew = require('hypercore')
-const Drive = require('@telios/nebula-drive')
-const Nebula = require('@telios/nebula')
-const { DateTime } = require('luxon')
+const Hypercore = require('hypercore')
+const HypercoreNew = require('@telios/nebula-new/node_modules/hypercore')
+const NebulaNew = require('@telios/nebula-new')
+const NebulaOld = require('@telios/nebula')
+const HyperbeeMessages = require('hyperbee/lib/messages.js')
+// const { DateTime } = require('luxon')
+const BSON = require('bson')
+const { ObjectId } = BSON
+
+const collections = ['file', 'Account', 'Mailbox', 'Folder', 'Files', 'Alias', 'AliasNamespace', 'Email', 'Contact']
 
 module.exports = async ({ rootdir, drivePath, keyPair, encryptionKey, data }) => {
   // 1. Output all transactions (encrypted) from Autobee into a migration folder. If migration folder exists, run migration
   try {
     // Start old drive
-    const drive = new Drive(path.join(rootdir, drivePath), null, {
+    const driveOld = new NebulaOld(path.join(rootdir, drivePath), null, {
       keyPair,
       encryptionKey,
       joinSwarm: false,
@@ -20,7 +26,7 @@ module.exports = async ({ rootdir, drivePath, keyPair, encryptionKey, data }) =>
       }
     })
 
-    await drive.ready()
+    await driveOld.ready()
 
     // 2. Create a new drive with the latest version
     fs.mkdirSync(path.join(rootdir, '/drive_new'))
@@ -28,15 +34,15 @@ module.exports = async ({ rootdir, drivePath, keyPair, encryptionKey, data }) =>
     fs.mkdirSync(path.join(rootdir, '/drive_new/Files'))
 
     // 3. Make file for migration script
-    await updateMigrationScript(data, drive, rootdir, drivePath)
+    await updateMigrationScript(data, driveOld, rootdir, drivePath)
 
     // Close old drive before extracting and populating Hypercores
-    await drive.close()
+    await driveOld.close()
 
     // 4. Remove new cores so they can be replace. The overwrite option in Hypercore does not seem to work as expected which is why these need to be deleted.
     await copyCores(rootdir, drivePath, encryptionKey)
 
-    const newDrive = new Nebula(path.join(rootdir, '/drive_new'), null, {
+    const newDrive = new NebulaNew(path.join(rootdir, '/drive_new'), null, {
       keyPair,
       encryptionKey,
       joinSwarm: false,
@@ -54,85 +60,44 @@ module.exports = async ({ rootdir, drivePath, keyPair, encryptionKey, data }) =>
 
     fs.renameSync(path.join(rootdir, drivePath), path.join(rootdir, drivePath + '_old'))
     fs.renameSync(path.join(rootdir, 'drive_new'), path.join(rootdir, drivePath))
-    fs.unlinkSync(path.join(rootdir, drivePath + '_old', '/migrate/data.json'))
+    fs.unlinkSync(path.join(rootdir, drivePath + '_old', '/migrate/data.txt'))
   } catch(err) {
     console.log(err)
   }
 }
 
 async function updateMigrationScript(db, drive, rootdir, drivePath) {
-    // Make file for migration script
-    const mainStream = drive.database.bee.createReadStream()
-    const metaStream = drive.database.metadb.createReadStream()
-    const localStream = drive._localHB.createReadStream()
+  // Make file for migration script
+  //const localStream = drive._localHB.createReadStream()
 
-  return new Promise((resolve, reject) => {
-    let finished = 0
+  fs.mkdirSync(path.join(rootdir, drivePath, '/migrate'))
 
-    mainStream.on('data', data => {
-      const item = JSON.parse(data.value.toString())
-      const sub = item.value.__sub
-
-      if(sub === 'file' && item.type !== 'del' && item.key !== 'backup/encrypted.db') {
-        delete item.value.__sub
-        db.main.collections.file.push(item.value)
-      }
-    })
-
-    mainStream.on('end', () => {
-      fs.writeFileSync(path.join(rootdir, drivePath, '/migrate/data.json'), JSON.stringify(db))
-      finished += 1
-      if(finished === 3) return resolve()
-    })
-
-    metaStream.on('data', data => {
-      const item = JSON.parse(data.value.toString())
-      db.meta[item.key] = item.value
-    })
-
-    metaStream.on('end', async () => {
-      for(const key in db.meta) {
-        const item = db.meta[key]
-
-        if(item.path && item.path !== '/backup/encrypted.db') {
-          try {
-            fs.statSync(path.join(rootdir, drivePath, '/Files', item.path))
-            fs.renameSync(path.join(rootdir, drivePath, '/Files',  item.path), path.join(rootdir, 'drive_new', '/Files',  item.path))
-          } catch(err) {
-            process.send({ event: 'debug:info', data: { name: 'DEL FILE ERR', err: JSON.stringify(err)} })
-          }
-        }
+  let dataFilePath = path.join(rootdir, drivePath, '/migrate/data.txt')
+  const metaStream = drive.metadb.createReadStream()
+    
+  for await (const data of metaStream) {
+    if(data.value.toString().indexOf('hyperbee') === -1) {
+      const op = HyperbeeMessages.Node.decode(data.value)
+      const node = {
+        key: op.key.toString('utf8'),
+        value: JSON.parse(op.value.toString('utf8')),
+        seq: data.seq
       }
 
-      fs.writeFileSync(path.join(rootdir, drivePath, '/migrate/data.json'), JSON.stringify(db))
-      finished += 1
-      if(finished === 3) return resolve()
-    })
+      if (node.key !== '__peers') {
+        fs.appendFileSync(dataFilePath, JSON.stringify({ collection: 'metadb', value: { ...node.value } }) + '\n')
+      }
+    }
+  }
 
-    localStream.on('data', data => {
-      const item = JSON.parse(data.value.toString())
-      db.local[item.key] = item.value
-    })
+  for await(const col of collections) {
+    const collection = await drive.database.collection(col)
+    const docs = await collection.find()
 
-    localStream.on('end', () => {
-      fs.writeFileSync(path.join(rootdir, drivePath, '/migrate/data.json'), JSON.stringify(db))
-      finished += 1
-      if(finished === 3) return resolve()
-    })
-
-    // Handle stream errors
-    mainStream.on('error', err => {
-      return reject(err)
-    })
-
-    metaStream.on('error', err => {
-      return reject(err)
-    })
-
-    localStream.on('error', err => {
-      return reject(err)
-    })
-  })
+    for(const doc of docs) {
+      fs.appendFileSync(dataFilePath, JSON.stringify({ collection: col, value: { ...doc } }) + '\n')
+    }
+  }
 }
 
 async function copyCores(rootdir, drivePath, encryptionKey) {
@@ -160,70 +125,34 @@ async function copyCores(rootdir, drivePath, encryptionKey) {
     }
 
   } catch(err) {
-    process.send({ event: 'CORE_MIGRATE_ERROR', data: { message: err.message, stack: err.stack } })
+    console.log({ event: 'CORE_MIGRATE_ERROR', data: { message: err.message, stack: err.stack } })
     throw err
   }
 }
 
 async function populateCores(drive, rootdir, drivePath) {
   try {
-    let data = fs.readFileSync(path.join(rootdir, drivePath, '/migrate/data.json'))
-    data = JSON.parse(data)
+    const rl = readline.createInterface({
+      input: fs.createReadStream(path.join(rootdir, drivePath, '/migrate/data.txt')),
+      crlfDelay: Infinity
+    });
 
-    const newMetadb = drive.database.metadb
-    const newLocalB = drive._localHB
+    for await(const line of rl) {
+      const data = JSON.parse(line)
+      const col = data.collection
+      const val = data.value
 
-    for(const key in data.meta) {
-      await newMetadb.put(key, data.meta[key])
-    }
-
-    for(const key in data.local) {
-      await newLocalB.put(key, data.local[key])
-    }
-    
-    for (const sub in data.main.collections) {
-      const items = data.main.collections[sub]
-      const collection = await drive.db.collection(sub)
-
-      for(const item of items) {   
-        if(sub === 'Email') {
-          const fullEmail = await getEmail(drive, item.path)
-
-          let email = {
-            emailId: fullEmail.emailId,
-            aliasId: fullEmail.aliasId,
-            folderId: fullEmail.folderId,
-            mailboxId: 1,
-            date: new Date(fullEmail.date).toISOString(),
-            unread: item.unread,
-            subject: fullEmail.subject,
-            toJSON: fullEmail.toJSON,
-            fromJSON: fullEmail.fromJSON,
-            attachments: fullEmail.attachments,
-            path: item.path,
-            createdAt: new Date(fullEmail.date).toISOString(),
-            updatedAt: new Date().toISOString()
-          }
-
-          if(fullEmail.bodyAsText) {
-            email.bodyAsText = fullEmail.bodyAsText.split(" ").slice(0, 20).join(" ")
-          }
-
-          if(email.emailId && email.folderId || email.emailId && email.aliasId) {
-            const doc = await collection.insert(email)
-            
-            await createSearchIndex(sub, collection, { ...fullEmail, _id: doc._id })
-          }
-        } else {
-          const doc = await collection.insert({ ...item })
-          await createSearchIndex(sub, collection, { ...item, _id: doc._id })
-        }
+      if(col === 'metadb') {
+        await drive.metadb.insert({ ...val, _id: ObjectId(val._id) })
+      } else {
+        const collection = await drive.db.collection(col)
+        const doc = await collection.insert({ ...val, _id: ObjectId(val._id) })
+        await createSearchIndex(col, collection, doc)
+        await createIndex(col, collection)
       }
-      await createIndex(sub, collection)
     }
-
   } catch(err) {
-    process.send({ event: 'POPULATE_ERROR', data: { message: err.message, stack: err.stack } })
+    console.log({ event: 'POPULATE_ERROR', data: { message: err.message, stack: err.stack } })
     throw err
   }
 }
@@ -234,12 +163,14 @@ async function createSearchIndex(name, collection, doc) {
       try {
         await collection.ftsIndex(['subject', 'toJSON', 'fromJSON', 'ccJSON', 'bccJSON', 'bodyAsText', 'attachments'], [doc])
       } catch(err) {
-        process.send({ event: 'INDEX_ERROR', data: { message: err.message, stack: err.stack } })
+        console.log({ event: 'INDEX_ERROR', data: { message: err.message, stack: err.stack } })
       }
       break
     case 'Contact':
       await collection.ftsIndex(['name', 'email'], [doc])
       break
+    default:
+      return
   }
 }
 
@@ -263,6 +194,8 @@ async function createIndex(name, collection) {
       await collection.createIndex(['createdAt', 'filename'])
       await collection.createIndex(['updatedAt'])
       break
+    default:
+      return
   }
 }
 

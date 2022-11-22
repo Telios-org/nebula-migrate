@@ -1,4 +1,4 @@
-const Drive = require('@telios/nebula-drive')
+const Drive = require('@telios/nebula')
 const fs = require('fs')
 
 module.exports.bootstrap = async ({ path, keyPair, encryptionKey }) => {
@@ -16,10 +16,10 @@ module.exports.bootstrap = async ({ path, keyPair, encryptionKey }) => {
 
     await drive.ready()
 
-    const collection = await drive.db.collection('foo')
+    const collection = await drive.db.collection('Account')
     
-    await collection.put('alice', { name: "alice" })
-    await collection.put('bob', { name: "bob" })
+    await collection.insert({ name: "alice" })
+    await collection.insert({ name: "bob" })
 
     const stream = fs.createReadStream('./index.js')
 
