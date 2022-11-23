@@ -1,12 +1,12 @@
 const fs = require('fs')
 const readline = require('readline')
 const path = require('path')
-const HypercoreOld = require('@telios/nebula-old/node_modules/hypercore')
-const HypercoreNew = require('hypercore')
 const NebulaNew = require('@telios/nebula')
 const NebulaOld = require('@telios/nebula-old')
+const HypercoreOld = require('@telios/nebula-old/node_modules/hypercore')
+const HypercoreNew = require('hypercore')
 const HyperbeeMessages = require('@telios/nebula-old/node_modules/hyperbee/lib/messages.js')
-// const { DateTime } = require('luxon')
+const { rmdir } = require('./util')
 const BSON = require('bson')
 const { ObjectId } = BSON
 
@@ -19,7 +19,7 @@ module.exports = async ({ rootdir, drivePath, keyPair, encryptionKey, data }) =>
     const driveOld = new NebulaOld(path.join(rootdir, drivePath), null, {
       keyPair,
       encryptionKey,
-      joinSwarm: false,
+      joinSwarm: true,
       swarmOpts: {
         server: true,
         client: true
@@ -62,6 +62,7 @@ module.exports = async ({ rootdir, drivePath, keyPair, encryptionKey, data }) =>
     fs.renameSync(path.join(rootdir, drivePath), path.join(rootdir, drivePath + '_old'))
     fs.renameSync(path.join(rootdir, 'drive_new'), path.join(rootdir, drivePath))
     fs.unlinkSync(path.join(rootdir, drivePath + '_old', '/migrate/data.txt'))
+    rmdir(path.join(rootdir, drivePath + '_old', '/migrate'))
   } catch(err) {
     console.log(err)
   }

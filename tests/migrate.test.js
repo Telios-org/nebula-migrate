@@ -7,6 +7,7 @@ const Nebula = require('@telios/nebula')
 const helper = require('./helper')
 const DHT = require('@hyperswarm/dht')
 const Migrate = require('../index')
+const { rmdir } = require('../util')
 
 test('migrate previous version to new version', async t => {
   t.plan(5)
@@ -52,10 +53,13 @@ test('migrate previous version to new version', async t => {
 
   const doc2 = await collection2.findOne({ name: 'bob' })
   t.ok(doc2)
+
+  t.teardown(async () => {
+    await drive.close()
+  })
 })
 
 test.onFinish(async () => {
-
   if (fs.existsSync(path.join(__dirname, '/drive'))) {
     rmdir(path.join(__dirname, '/drive'))
   }
@@ -66,23 +70,3 @@ test.onFinish(async () => {
 
   process.exit(0)
 })
-
-function rmdir(dir) {
-  const list = fs.readdirSync(dir)
-
-  for(let i = 0; i < list.length; i++) {
-    const filename = path.join(dir, list[i])
-    const stat = fs.statSync(filename)
-
-    if(filename == "." || filename == "..") {
-      // pass these files
-    } else if(stat.isDirectory()) {
-      // rmdir recursively
-      rmdir(filename)
-    } else {
-      // rm fiilename
-      fs.unlinkSync(filename)
-    }
-  }
-  fs.rmdirSync(dir)
-}
