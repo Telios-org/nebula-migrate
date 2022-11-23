@@ -1,11 +1,11 @@
 const fs = require('fs')
 const readline = require('readline')
 const path = require('path')
-const Hypercore = require('hypercore')
-const HypercoreNew = require('@telios/nebula-new/node_modules/hypercore')
-const NebulaNew = require('@telios/nebula-new')
-const NebulaOld = require('@telios/nebula')
-const HyperbeeMessages = require('hyperbee/lib/messages.js')
+const HypercoreOld = require('@telios/nebula-old/node_modules/hypercore')
+const HypercoreNew = require('hypercore')
+const NebulaNew = require('@telios/nebula')
+const NebulaOld = require('@telios/nebula-old')
+const HyperbeeMessages = require('@telios/nebula-old/node_modules/hyperbee/lib/messages.js')
 // const { DateTime } = require('luxon')
 const BSON = require('bson')
 const { ObjectId } = BSON
@@ -75,6 +75,11 @@ function copyFiles(rootdir, drivePath) {
     const dest = path.join(rootdir, 'drive_new/Files', file)
     fs.copyFileSync(currDir, dest)
   }
+
+  // Copy device file
+  if (fs.existsSync(path.join(rootdir, drivePath, '/device'))) {
+    fs.copyFileSync(path.join(rootdir, drivePath, '/device'), path.join(rootdir, 'drive_new/device'))
+  }
 }
 
 async function updateMigrationScript(db, drive, rootdir, drivePath) {
@@ -119,7 +124,7 @@ async function copyCores(rootdir, drivePath, encryptionKey) {
     cores = fs.readdirSync(path.join(rootdir, drivePath, '/Database'))
     for(const core of cores) {
       if(core.indexOf('.DS_Store') === -1) {
-        let feed = new Hypercore(path.join(rootdir, drivePath, '/Database/' + core), { encryptionKey })
+        let feed = new HypercoreOld(path.join(rootdir, drivePath, '/Database/' + core), { encryptionKey })
         
         await feed.ready()
 

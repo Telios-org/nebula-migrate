@@ -1,4 +1,4 @@
-const Drive = require('@telios/nebula')
+const Drive = require('@telios/nebula-old')
 const fs = require('fs')
 
 module.exports.bootstrap = async ({ path, keyPair, encryptionKey }) => {

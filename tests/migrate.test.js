@@ -3,7 +3,7 @@ const _test = require('tape-promise').default
 const test = _test(tape)
 const fs = require('fs')
 const path = require('path')
-const Nebula = require('@telios/nebula-new')
+const Nebula = require('@telios/nebula')
 const helper = require('./helper')
 const DHT = require('@hyperswarm/dht')
 const Migrate = require('../index')
@@ -56,13 +56,13 @@ test('migrate previous version to new version', async t => {
 
 test.onFinish(async () => {
 
-  // if (fs.existsSync(path.join(__dirname, '/drive'))) {
-  //   rmdir(path.join(__dirname, '/drive'))
-  // }
+  if (fs.existsSync(path.join(__dirname, '/drive'))) {
+    rmdir(path.join(__dirname, '/drive'))
+  }
 
-  // if (fs.existsSync(path.join(__dirname, '/drive_old'))) {
-  //   rmdir(path.join(__dirname, '/drive_old'))
-  // }
+  if (fs.existsSync(path.join(__dirname, '/drive_old'))) {
+    rmdir(path.join(__dirname, '/drive_old'))
+  }
 
   process.exit(0)
 })

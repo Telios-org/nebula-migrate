@@ -22,7 +22,7 @@
     "tape-promise": "^4.0.0"
   },
   "dependencies": {
-    "@telios/nebula": "^3.4.14",
-    "@telios/nebula-new": "git+https://github.com/Telios-org/nebula#upgrades"
+    "@telios/nebula-old": "git+https://github.com/Telios-org/nebula",
+    "@telios/nebula": "git+https://github.com/Telios-org/nebula#upgrades"
   }
 }
