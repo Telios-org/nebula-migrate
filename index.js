@@ -163,7 +163,18 @@ async function populateCores(drive, rootdir, drivePath) {
         await drive.metadb.insert({ ...val, _id: ObjectId(val._id) })
       } else {
         const collection = await drive.db.collection(col)
-        const doc = await collection.insert({ ...val, _id: ObjectId(val._id) })
+
+        let value = { ...val, _id: ObjectId(val._id) }
+
+        if(col === 'Account' || col === 'Mailbox') {
+          value.type = 'PRIMARY'
+        }
+
+        if(col === 'Mailbox' && value.name) {
+          value.displayName = value.name
+        }
+
+        const doc = await collection.insert(value)
         await createSearchIndex(col, collection, doc)
         await createIndex(col, collection)
       }
