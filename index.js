@@ -1,5 +1,6 @@
 const fs = require('fs')
 const readline = require('readline')
+const { DateTime } = require('luxon')
 const path = require('path')
 const NebulaNew = require('@telios/nebula')
 const NebulaOld = require('@telios/nebula-old')
@@ -172,6 +173,9 @@ async function populateCores(drive, rootdir, drivePath) {
 
         if(col === 'Mailbox' && value.name) {
           value.displayName = value.name
+          value.domainKey = 'telios.io'
+          value.createdAt = DateTime.local().toUTC()
+          value.updatedAt = DateTime.local().toUTC()
         }
 
         const doc = await collection.insert(value)
