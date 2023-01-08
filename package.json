@@ -17,7 +17,7 @@
   },
   "homepage": "https://github.com/Telios-org/nebula-migrate#readme",
   "devDependencies": {
-    "@telios/nebula": "^4.0.4",
+    "@telios/nebula": "git+https://github.com/Telios-org/nebula",
     "tap-spec": "^5.0.0",
     "tape": "^5.4.0",
     "tape-promise": "^4.0.0"
